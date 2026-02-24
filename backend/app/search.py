@@ -1,28 +1,26 @@
-@app.get("/search")
-def search(q: str = "*", user=Depends(get_current_user)):
+from fastapi import APIRouter, Depends
+from app.auth import get_current_user
+from app.opensearch import client
 
-    must = []
+router = APIRouter()
 
-    if user["role"] != "admin":
-        must.append({"term": {"tenant": user["tenant"]}})
 
-    query_body = {
+@router.get("/search")
+def search(q: str, user=Depends(get_current_user)):
+
+    if user["role"] == "admin":
+        index_name = "logs-*"
+    else:
+        index_name = f"logs-{user['tenant']}-*"
+
+    query = {
         "query": {
-            "bool": {
-                "must": must
-            }
-        },
-        "aggs": {
-            "top_ip": {
-                "terms": {"field": "src_ip"}
-            },
-            "timeline": {
-                "date_histogram": {
-                    "field": "@timestamp",
-                    "calendar_interval": "minute"
-                }
+            "query_string": {
+                "query": q
             }
         }
     }
 
-    return client.search(index="logs-demo", body=query_body)
+    result = client.search(index=index_name, body=query)
+
+    return result

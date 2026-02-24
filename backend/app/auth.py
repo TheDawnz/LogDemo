@@ -1,35 +1,86 @@
-from fastapi import Depends, HTTPException
-from fastapi.security import OAuth2PasswordBearer
-from jose import jwt
+from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from app.authModels import User
 from passlib.context import CryptContext
+from jose import jwt
+from datetime import datetime, timedelta
 import os
 
-SECRET = os.getenv("JWT_SECRET", "supersecret")
+from app.database import SessionLocal
+from app.models import User
+
+router = APIRouter()
+pwd_context = CryptContext(schemes=["bcrypt_sha256"])
+
+SECRET_KEY = os.getenv("SECRET_KEY", "supersecret")
 ALGORITHM = "HS256"
 
-pwd_context = CryptContext(schemes=["bcrypt_sha256"])
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+
+class RegisterRequest(BaseModel):
+    username: str
+    password: str
+    role: str
+    tenant: str
 
 
-def authenticate(db: Session, username: str, password: str):
-    user = db.query(User).filter(User.username == username).first()
+class LoginRequest(BaseModel):
+    username: str
+    password: str
 
-    if not user:
-        return None
-
-    if not pwd_context.verify(password, user.password):
-        return None
-
-    return user
 
 def create_token(data: dict):
-    return jwt.encode(data, SECRET, algorithm=ALGORITHM)
+    expire = datetime.utcnow() + timedelta(hours=2)
+    data.update({"exp": expire})
+    return jwt.encode(data, SECRET_KEY, algorithm=ALGORITHM)
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
-    try:
-        payload = jwt.decode(token, SECRET, algorithms=[ALGORITHM])
-        return payload
-    except:
-        raise HTTPException(status_code=401, detail="Invalid token")
+
+def get_current_user(token: str = Depends(lambda: None)):
+    from fastapi.security import HTTPBearer
+    from fastapi import Security
+
+    security = HTTPBearer()
+    credentials = Security(security)
+
+    payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+    return payload
+
+
+@router.post("/register")
+def register(req: RegisterRequest):
+    db: Session = SessionLocal()
+
+    hashed = pwd_context.hash(req.password)
+
+    user = User(
+        username=req.username,
+        password=hashed,
+        role=req.role,
+        tenant=req.tenant,
+    )
+
+    db.add(user)
+    db.commit()
+    db.close()
+
+    return {"status": "created"}
+
+
+@router.post("/login")
+def login(req: LoginRequest):
+    db: Session = SessionLocal()
+
+    user = db.query(User).filter(User.username == req.username).first()
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    if not pwd_context.verify(req.password, user.password):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    token = create_token({
+        "sub": user.username,
+        "role": user.role,
+        "tenant": user.tenant
+    })
+
+    db.close()
+    return {"access_token": token}

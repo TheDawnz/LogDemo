@@ -1,13 +1,8 @@
 fastapi
 uvicorn
-opensearch-py
-python-dotenv
-pydantic
+sqlalchemy
+psycopg2-binary
+python-jose
 passlib[bcrypt]
 bcrypt==4.0.1
-python-jose
-python-multipart
-psycopg2-binary
-sqlalchemy
-pydantic
-typing_extensions
+opensearch-py
