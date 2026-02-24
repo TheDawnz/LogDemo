@@ -4,4 +4,10 @@ opensearch-py
 python-dotenv
 pydantic
 passlib[bcrypt]
+bcrypt==4.0.1
 python-jose
+python-multipart
+psycopg2-binary
+sqlalchemy
+pydantic
+typing_extensions

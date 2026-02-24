@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
 
   opensearch:
@@ -14,16 +12,43 @@ services:
       - "9200:9200"
     volumes:
       - os-data:/usr/share/opensearch/data
+  
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_DB: logdb
+      POSTGRES_USER: loguser
+      POSTGRES_PASSWORD: logpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
 
   backend:
     build: ./backend
+    volumes:
+    - ./backend:/app
     container_name: backend
     depends_on:
       - opensearch
+      - postgres
     ports:
       - "8000:8000"
     env_file:
       - .env
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  fluentbit:
+    image: fluent/fluent-bit:2.2
+    container_name: fluentbit
+    volumes:
+      - ./ingest/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
+    ports:
+      - "5140:5140"
+    depends_on:
+      - backend
 
 volumes:
   os-data:
+  pg-data:

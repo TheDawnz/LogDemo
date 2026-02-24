@@ -6,3 +6,6 @@ down:
 
 logs:
 	docker compose logs -f
+
+rebackend:
+	docker compose restart backend
