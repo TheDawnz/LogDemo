@@ -50,7 +50,7 @@ def ingest_syslog(
             "raw": message
         }
 
-        index_name = f"logs-demoA-{datetime.utcnow().strftime('%Y.%m.%d')}"
+        index_name = f"logs-demoa-{datetime.utcnow().strftime('%Y.%m.%d')}"
 
         client.index(index=index_name, body=parsed)
 

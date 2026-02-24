@@ -1,56 +1,54 @@
-version: "3.9"
-
 services:
-
-  postgres:
-    image: postgres:15
-    container_name: postgres
-    environment:
-      POSTGRES_USER: loguser
-      POSTGRES_PASSWORD: logpass
-      POSTGRES_DB: logdb
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata:/var/lib/postgresql/data
 
   opensearch:
     image: opensearchproject/opensearch:2.12.0
     container_name: opensearch
     environment:
       - discovery.type=single-node
-      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=admin
       - plugins.security.disabled=true
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=${OPENSEARCH_INITIAL_ADMIN_PASSWORD}
     ports:
       - "9200:9200"
-      - "9600:9600"
     volumes:
-      - osdata:/usr/share/opensearch/data
+      - os-data:/usr/share/opensearch/data
+  
+  postgres:
+    image: postgres:15
+    container_name: postgres
+    environment:
+      POSTGRES_DB: logdb
+      POSTGRES_USER: loguser
+      POSTGRES_PASSWORD: logpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg-data:/var/lib/postgresql/data
 
   backend:
     build: ./backend
+    volumes:
+    - ./backend:/app
     container_name: backend
+    depends_on:
+      - opensearch
+      - postgres
     ports:
       - "8000:8000"
     env_file:
       - .env
-    depends_on:
-      - postgres
-      - opensearch
-    volumes:
-      - ./backend:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   fluentbit:
     image: fluent/fluent-bit:2.2
     container_name: fluentbit
-    depends_on:
-      - backend
     volumes:
       - ./ingest/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf
     ports:
       - "5140:5140"
+    depends_on:
+      - backend
 
 volumes:
-  pgdata:
-  osdata:
+  os-data:
+  pg-data:
